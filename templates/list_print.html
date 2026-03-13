@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Список: {{ lst.name }}</title>
+    <style>
+        body { font-family: sans-serif; max-width: 400px; margin: 2rem auto; padding: 1rem; }
+        h1 { font-size: 1.5rem; border-bottom: 2px solid #333; padding-bottom: 0.5rem; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 0.3rem 0; border-bottom: 1px solid #eee; }
+        .category { font-weight: bold; color: #666; margin-top: 1rem; }
+        @media print { body { margin: 0; } }
+    </style>
+</head>
+<body>
+    <h1>{{ lst.name }}</h1>
+    <p class="text-muted small">Напечатано {{ now.strftime('%d.%m.%Y %H:%M') if now else '' }}</p>
+    <ul>
+        {% for item in items %}
+        <li>☐ {{ item.name }}{% if item.quantity > 1 %} ×{{ item.quantity }}{% endif %}{% if item.category_name %} <span class="category">({{ item.category_name }})</span>{% endif %}</li>
+        {% else %}
+        <li class="text-muted">Список пуст</li>
+        {% endfor %}
+    </ul>
+    <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>

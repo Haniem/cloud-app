@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card p-4">
+            <h1 class="h4 mb-4 text-center">Вход</h1>
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label">Логин или email</label>
+                    <input type="text" name="username" class="form-control" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Пароль</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Войти</button>
+            </form>
+            <p class="text-center mt-3 mb-0 text-muted small">
+                Нет аккаунта? <a href="{{ url_for('register') }}">Регистрация</a>
+            </p>
+        </div>
+        <p class="text-center text-white-50 small mt-2">Облачное приложение • Основы облачных технологий</p>
+    </div>
+</div>
+{% endblock %}

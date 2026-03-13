@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}История покупок{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card p-4">
+            <h1 class="h4 mb-4">История покупок</h1>
+            <p class="text-muted small">Последние 100 купленных товаров</p>
+            {% if items %}
+            <ul class="list-group list-group-flush">
+                {% for i in items %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>{{ i.name }}</strong>{% if i.quantity > 1 %} ×{{ i.quantity }}{% endif %}
+                        <br><small class="text-muted">в «{{ i.list_name }}»</small>
+                    </span>
+                    <small class="text-muted">
+                        {% if i.bought_at %}
+                        {{ i.bought_at[:10] if i.bought_at else '' }}
+                        {% endif %}
+                    </small>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted">Пока нет купленных товаров</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

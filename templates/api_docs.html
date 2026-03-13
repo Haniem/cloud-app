@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}REST API{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="card p-4">
+            <h1 class="h4 mb-4">REST API</h1>
+            <p class="text-muted">Доступ по сессии (нужно быть авторизованным). Базовый URL: <code>{{ request.url_root }}api</code></p>
+            <table class="table table-sm">
+                <thead>
+                    <tr><th>Метод</th><th>URL</th><th>Описание</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>GET</td><td><code>/api/lists</code></td><td>Список всех списков</td></tr>
+                    <tr><td>POST</td><td><code>/api/lists</code></td><td>Создать список (JSON: {"name": "..."})</td></tr>
+                    <tr><td>GET</td><td><code>/api/lists/&lt;id&gt;</code></td><td>Получить список с товарами</td></tr>
+                    <tr><td>POST</td><td><code>/api/lists/&lt;id&gt;/items</code></td><td>Добавить товар (JSON: {"name": "...", "quantity": 1, "category_id": 1})</td></tr>
+                    <tr><td>POST</td><td><code>/api/lists/&lt;id&gt;/items/&lt;item_id&gt;/toggle</code></td><td>Отметить купленным/не купленным</td></tr>
+                    <tr><td>DELETE</td><td><code>/api/lists/&lt;id&gt;/items/&lt;item_id&gt;</code></td><td>Удалить товар</td></tr>
+                    <tr><td>GET</td><td><code>/api/templates</code></td><td>Список шаблонов</td></tr>
+                </tbody>
+            </table>
+            <p class="small text-muted">Пример: <code>curl -X POST -H "Content-Type: application/json" -d '{"name":"Тест"}' {{ request.url_root }}api/lists</code> (с cookies сессии)</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

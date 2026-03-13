@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 mx-auto">
+        <div class="card p-4">
+            <h1 class="h4 mb-4">Настройки</h1>
+
+            <h6 class="mb-2">Изменить пароль</h6>
+            <form method="post" class="mb-4">
+                <input type="hidden" name="action" value="password">
+                <div class="mb-2">
+                    <input type="password" name="current_password" class="form-control form-control-sm" placeholder="Текущий пароль" required>
+                </div>
+                <div class="mb-2">
+                    <input type="password" name="new_password" class="form-control form-control-sm" placeholder="Новый пароль (мин. 4)" required minlength="4">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Сохранить пароль</button>
+            </form>
+
+            <hr>
+
+            <h6 class="mb-2">Изменить email</h6>
+            <form method="post">
+                <input type="hidden" name="action" value="email">
+                <div class="mb-2">
+                    <input type="email" name="email" class="form-control form-control-sm" value="{{ user.email }}" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Сохранить email</button>
+            </form>
+
+            <p class="text-muted small mt-3 mb-0">Логин: {{ user.username }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
