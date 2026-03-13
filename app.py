@@ -24,6 +24,16 @@ def get_db():
     return conn
 
 
+def log_pantry_activity(user_id, product_id, action, from_state=None, to_state=None, note=None):
+    conn = get_db()
+    conn.execute(
+        'INSERT INTO pantry_activity (user_id, product_id, action, from_state, to_state, note) VALUES (?, ?, ?, ?, ?, ?)',
+        (user_id, product_id, action, from_state, to_state, note)
+    )
+    conn.commit()
+    conn.close()
+
+
 def init_db():
     conn = get_db()
     conn.executescript('''
@@ -74,6 +84,48 @@ def init_db():
             name TEXT NOT NULL,
             items_json TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            category_id INTEGER,
+            FOREIGN KEY (category_id) REFERENCES categories(id)
+        );
+        CREATE TABLE IF NOT EXISTS user_products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            state INTEGER NOT NULL DEFAULT 1,
+            notes TEXT,
+            UNIQUE(user_id, product_id),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        );
+        CREATE TABLE IF NOT EXISTS user_product_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_product_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_product_id) REFERENCES user_products(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS pantry_activity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            from_state INTEGER,
+            to_state INTEGER,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        );
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id INTEGER PRIMARY KEY,
+            show_activity INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
         INSERT OR IGNORE INTO categories (id, name, color) VALUES
             (1, 'Продукты', '#28a745'),
             (2, 'Бытовая химия', '#17a2b8'),
@@ -84,6 +136,275 @@ def init_db():
             (1, 'Продукты на неделю', '[{"name":"Молоко","cat":3,"qty":2},{"name":"Хлеб","cat":1,"qty":2},{"name":"Яйца","cat":1,"qty":1},{"name":"Сыр","cat":3,"qty":1},{"name":"Масло","cat":1,"qty":1},{"name":"Картофель","cat":4,"qty":1},{"name":"Морковь","cat":4,"qty":1},{"name":"Лук","cat":4,"qty":1},{"name":"Средство для мытья посуды","cat":2,"qty":1}]'),
             (2, 'Пикник', '[{"name":"Хлеб","cat":1,"qty":2},{"name":"Колбаса","cat":1,"qty":1},{"name":"Сыр","cat":3,"qty":1},{"name":"Огурцы","cat":4,"qty":2},{"name":"Помидоры","cat":4,"qty":2},{"name":"Напитки","cat":5,"qty":4},{"name":"Пакеты для мусора","cat":2,"qty":1}]'),
             (3, 'Домашняя уборка', '[{"name":"Средство для пола","cat":2,"qty":1},{"name":"Средство для окон","cat":2,"qty":1},{"name":"Губки","cat":2,"qty":2},{"name":"Мешки для мусора","cat":2,"qty":1},{"name":"Бумажные полотенца","cat":2,"qty":1}]');
+        INSERT OR IGNORE INTO products (name, category_id) VALUES
+            ('Молоко 3,2%', 3),
+            ('Молоко 2,5%', 3),
+            ('Кефир', 3),
+            ('Ряженка', 3),
+            ('Сметана 20%', 3),
+            ('Сметана 15%', 3),
+            ('Творог 5%', 3),
+            ('Творог 9%', 3),
+            ('Йогурт питьевой', 3),
+            ('Йогурт густой', 3),
+            ('Сыр российский', 3),
+            ('Сыр голландский', 3),
+            ('Сыр моцарелла', 3),
+            ('Сыр плавленый', 3),
+            ('Масло сливочное', 3),
+            ('Маргарин', 1),
+            ('Яйца куриные', 1),
+            ('Хлеб белый', 1),
+            ('Хлеб чёрный', 1),
+            ('Батон нарезной', 1),
+            ('Булочки', 1),
+            ('Лаваш', 1),
+            ('Макароны', 1),
+            ('Спагетти', 1),
+            ('Рис длиннозёрный', 1),
+            ('Рис круглозёрный', 1),
+            ('Гречка', 1),
+            ('Овсяные хлопья', 1),
+            ('Перловка', 1),
+            ('Пшено', 1),
+            ('Манка', 1),
+            ('Сахар-песок', 1),
+            ('Соль поваренная', 1),
+            ('Перец чёрный молотый', 1),
+            ('Мука пшеничная', 1),
+            ('Мука ржаная', 1),
+            ('Сода пищевая', 1),
+            ('Разрыхлитель теста', 1),
+            ('Дрожжи сухие', 1),
+            ('Майонез', 1),
+            ('Кетчуп', 1),
+            ('Растительное масло подсолнечное', 1),
+            ('Оливковое масло', 1),
+            ('Уксус 9%', 1),
+            ('Соевый соус', 1),
+            ('Томатная паста', 1),
+            ('Консервированная кукуруза', 1),
+            ('Консервированный горошек', 1),
+            ('Консервированные огурцы', 1),
+            ('Консервированные помидоры', 1),
+            ('Тушёнка говяжья', 1),
+            ('Тушёнка свиная', 1),
+            ('Сгущённое молоко', 3),
+            ('Шоколад плиточный', 5),
+            ('Конфеты шоколадные', 5),
+            ('Печенье сахарное', 5),
+            ('Печенье овсяное', 5),
+            ('Вафли', 5),
+            ('Пряники', 5),
+            ('Зефир', 5),
+            ('Мармелад', 5),
+            ('Мёд', 5),
+            ('Джем', 5),
+            ('Варенье клубничное', 5),
+            ('Варенье малиновое', 5),
+            ('Чай чёрный', 5),
+            ('Чай зелёный', 5),
+            ('Кофе молотый', 5),
+            ('Кофе растворимый', 5),
+            ('Какао', 5),
+            ('Минеральная вода', 5),
+            ('Вода питьевая в бутылке', 5),
+            ('Сок апельсиновый', 5),
+            ('Сок яблочный', 5),
+            ('Сок томатный', 5),
+            ('Компот в бутылке', 5),
+            ('Газированный напиток кола', 5),
+            ('Газированный напиток лимонный', 5),
+            ('Колбаса варёная', 1),
+            ('Колбаса копчёная', 1),
+            ('Сосиски', 1),
+            ('Сардельки', 1),
+            ('Ветчина', 1),
+            ('Бекон', 1),
+            ('Фарш говяжий', 1),
+            ('Фарш свино-говяжий', 1),
+            ('Курица целая', 1),
+            ('Куриные бёдра', 1),
+            ('Куриные крылья', 1),
+            ('Куриное филе', 1),
+            ('Индейка филе', 1),
+            ('Свинина на кости', 1),
+            ('Свинина мякоть', 1),
+            ('Говядина мякоть', 1),
+            ('Филе рыбы белой', 1),
+            ('Филе лосося', 1),
+            ('Сельдь солёная', 1),
+            ('Шпроты в масле', 1),
+            ('Крабовые палочки', 1),
+            ('Креветки замороженные', 1),
+            ('Пельмени', 1),
+            ('Вареники с картошкой', 1),
+            ('Вареники с творогом', 1),
+            ('Пицца замороженная', 1),
+            ('Овощная смесь замороженная', 4),
+            ('Брокколи замороженная', 4),
+            ('Цветная капуста замороженная', 4),
+            ('Картофель', 4),
+            ('Морковь', 4),
+            ('Лук репчатый', 4),
+            ('Чеснок', 4),
+            ('Свёкла', 4),
+            ('Капуста белокочанная', 4),
+            ('Капуста пекинская', 4),
+            ('Огурцы свежие', 4),
+            ('Помидоры свежие', 4),
+            ('Перец болгарский', 4),
+            ('Кабачки', 4),
+            ('Баклажаны', 4),
+            ('Редис', 4),
+            ('Зелёный лук', 4),
+            ('Укроп свежий', 4),
+            ('Петрушка свежая', 4),
+            ('Салат листовой', 4),
+            ('Шпинат', 4),
+            ('Яблоки', 4),
+            ('Груши', 4),
+            ('Апельсины', 4),
+            ('Мандарины', 4),
+            ('Бананы', 4),
+            ('Лимоны', 4),
+            ('Лаймы', 4),
+            ('Виноград', 4),
+            ('Персики', 4),
+            ('Нектарины', 4),
+            ('Сливы', 4),
+            ('Арбуз', 4),
+            ('Дыня', 4),
+            ('Киви', 4),
+            ('Грейпфрут', 4),
+            ('Замороженная клубника', 4),
+            ('Замороженная малина', 4),
+            ('Замороженная вишня', 4),
+            ('Сахарная пудра', 5),
+            ('Крахмал картофельный', 1),
+            ('Крахмал кукурузный', 1),
+            ('Майонез оливковый', 1),
+            ('Соус барбекю', 1),
+            ('Горчица', 1),
+            ('Хрен столовый', 1),
+            ('Аджика', 1),
+            ('Хмели-сунели', 1),
+            ('Приправа для курицы', 1),
+            ('Приправа для рыбы', 1),
+            ('Приправа для мяса', 1),
+            ('Лавровый лист', 1),
+            ('Гвоздика пряность', 1),
+            ('Корица молотая', 1),
+            ('Ванильный сахар', 1),
+            ('Желе в порошке', 5),
+            ('Желатин', 1),
+            ('Кукурузные хлопья', 5),
+            ('Мюсли', 5),
+            ('Семечки подсолнечные', 5),
+            ('Арахис жареный', 5),
+            ('Фисташки солёные', 5),
+            ('Чипсы картофельные', 5),
+            ('Сухарики', 5),
+            ('Попкорн для микроволновки', 5),
+            ('Мороженое пломбир', 5),
+            ('Мороженое эскимо', 5),
+            ('Йогурт питьевой детский', 3),
+            ('Детское пюре фруктовое', 5),
+            ('Детское пюре овощное', 5),
+            ('Смесь молочная детская', 3),
+            ('Сок детский в коробке', 5),
+            ('Пюре картофельное быстрого приготовления', 1),
+            ('Лапша быстрого приготовления', 1),
+            ('Крабовые чипсы', 5),
+            ('Сырный соус', 1),
+            ('Сметанный соус', 1),
+            ('Хлебцы ржаные', 1),
+            ('Хлебцы хрустящие', 1),
+            ('Рулет бисквитный', 5),
+            ('Торт бисквитный', 5),
+            ('Пирожное картошка', 5),
+            ('Круассаны упаковка', 5),
+            ('Сухое печенье к чаю', 5),
+            ('Сырок глазированный', 3),
+            ('Ряженка детская', 3),
+            ('Кефир детский', 3),
+            ('Творожок детский', 3),
+            ('Вода детская', 5),
+            ('Средство для мытья посуды', 2),
+            ('Губки кухонные', 2),
+            ('Салфетки бумажные', 2),
+            ('Полотенца бумажные', 2),
+            ('Туалетная бумага', 2),
+            ('Стиральный порошок', 2),
+            ('Гель для стирки', 2),
+            ('Кондиционер для белья', 2),
+            ('Средство для мытья пола', 2),
+            ('Средство для ванной', 2),
+            ('Средство для туалета', 2),
+            ('Средство для стёкол', 2),
+            ('Чистящее средство универсальное', 2),
+            ('Порошок чистящий', 2),
+            ('Щётка для унитаза', 2),
+            ('Перчатки резиновые', 2),
+            ('Пакеты для мусора', 2),
+            ('Мешки для мусора большие', 2),
+            ('Фольга пищевая', 2),
+            ('Пергамент для выпечки', 2),
+            ('Плёнка пищевая', 2),
+            ('Пакеты для заморозки', 2),
+            ('Губка металлическая', 2),
+            ('Освежитель воздуха', 2),
+            ('Средство от накипи', 2),
+            ('Салфетки влажные', 2),
+            ('Салфетки для уборки микрофибра', 2),
+            ('Щётка для пола', 2),
+            ('Швабра', 2),
+            ('Моющее средство для посудомоечной машины', 2),
+            ('Соль для посудомоечной машины', 2),
+            ('Ополаскиватель для посудомоечной машины', 2),
+            ('Таблетки для ПММ', 2),
+            ('Мыло жидкое', 2),
+            ('Мыло кусковое', 2),
+            ('Шампунь', 2),
+            ('Бальзам для волос', 2),
+            ('Гель для душа', 2),
+            ('Пена для бритья', 2),
+            ('Крем для бритья', 2),
+            ('Лезвия для бритвы', 2),
+            ('Зубная паста', 2),
+            ('Зубные щётки', 2),
+            ('Зубная нить', 2),
+            ('Ополаскиватель для рта', 2),
+            ('Дезодорант мужской', 2),
+            ('Дезодорант женский', 2),
+            ('Крем для рук', 2),
+            ('Крем для лица', 2),
+            ('Ватные палочки', 2),
+            ('Ватные диски', 2),
+            ('Средство для снятия макияжа', 2),
+            ('Прокладки женские', 2),
+            ('Тампоны', 2),
+            ('Подгузники детские', 2),
+            ('Салфетки детские влажные', 2),
+            ('Мусорные пакеты с завязками', 2),
+            ('Освежитель для холодильника', 2),
+            ('Средство для мытья кухни', 2),
+            ('Средство от плесени', 2),
+            ('Средство от насекомых', 2),
+            ('Батарейки AA', 5),
+            ('Батарейки AAA', 5),
+            ('Лампочка светодиодная', 5),
+            ('Спички', 5),
+            ('Зажигалка', 5),
+            ('Фильтры для воды', 5),
+            ('Пакеты фасовочные', 2),
+            ('Одноразовые тарелки', 2),
+            ('Одноразовые стаканчики', 2),
+            ('Одноразовые вилки и ложки', 2),
+            ('Скрепки канцелярские', 5),
+            ('Пакетики для завтрака', 2),
+            ('Полоски для чистки унитаза', 2),
+            ('Освежитель для обуви', 2);
     ''')
     conn.commit()
     conn.close()
@@ -439,6 +760,38 @@ def list_duplicate(list_id):
     return redirect(url_for('list_view', list_id=new_id))
 
 
+@app.route('/list/<int:list_id>/save-template', methods=['POST'])
+@login_required
+@list_access('viewer')
+def list_save_template(list_id):
+    name = request.form.get('template_name', '').strip()
+    if not name:
+        name = 'Шаблон списка'
+    conn = get_db()
+    items = conn.execute('SELECT name, category_id as cat, quantity as qty, notes FROM items WHERE list_id = ? AND bought = 0',
+                         (list_id,)).fetchall()
+    if not items:
+        conn.close()
+        flash('Нечего сохранять в шаблон (нет активных товаров)', 'warning')
+        return redirect(url_for('list_view', list_id=list_id))
+    items_payload = []
+    for it in items:
+        items_payload.append({
+            'name': it['name'],
+            'cat': it['cat'],
+            'qty': it['qty'],
+            'notes': it['notes'] or ''
+        })
+    conn.execute(
+        'INSERT INTO list_templates (name, items_json) VALUES (?, ?)',
+        (name, json.dumps(items_payload, ensure_ascii=False))
+    )
+    conn.commit()
+    conn.close()
+    flash('Шаблон списка сохранён', 'success')
+    return redirect(url_for('list_view', list_id=list_id))
+
+
 @app.route('/list/new/from-template/<int:template_id>', methods=['GET', 'POST'])
 @login_required
 def list_from_template(template_id):
@@ -613,6 +966,381 @@ def settings():
     conn.close()
     return render_template('settings.html', user=user)
 
+
+@app.route('/me/profile', methods=['GET', 'POST'])
+@login_required
+def my_profile():
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'privacy':
+            show = 1 if request.form.get('show_activity') == '1' else 0
+            conn = get_db()
+            conn.execute(
+                'INSERT INTO user_settings (user_id, show_activity) VALUES (?, ?) '
+                'ON CONFLICT(user_id) DO UPDATE SET show_activity = excluded.show_activity',
+                (current_user.id, show)
+            )
+            conn.commit()
+            conn.close()
+            flash('Настройки приватности обновлены', 'success')
+        return redirect(url_for('my_profile'))
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (current_user.id,)).fetchone()
+    settings_row = conn.execute('SELECT show_activity FROM user_settings WHERE user_id = ?', (current_user.id,)).fetchone()
+    show_activity = settings_row['show_activity'] == 1 if settings_row else False
+    activity = conn.execute('''
+        SELECT a.*, p.name as product_name
+        FROM pantry_activity a
+        JOIN products p ON a.product_id = p.id
+        WHERE a.user_id = ?
+        ORDER BY a.created_at DESC
+        LIMIT 200
+    ''', (current_user.id,)).fetchall()
+    conn.close()
+    return render_template('profile.html', user=user, is_owner=True, show_activity=show_activity,
+                           can_view_activity=True, activity=activity)
+
+
+@app.route('/user/<username>/profile')
+@login_required
+def user_profile(username):
+    conn = get_db()
+    user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    if not user:
+        conn.close()
+        abort(404)
+    settings_row = conn.execute('SELECT show_activity FROM user_settings WHERE user_id = ?', (user['id'],)).fetchone()
+    show_activity = settings_row['show_activity'] == 1 if settings_row else False
+    can_view = (user['id'] == current_user.id) or show_activity
+    activity = []
+    if can_view:
+        activity = conn.execute('''
+            SELECT a.*, p.name as product_name
+            FROM pantry_activity a
+            JOIN products p ON a.product_id = p.id
+            WHERE a.user_id = ?
+            ORDER BY a.created_at DESC
+            LIMIT 200
+        ''', (user['id'],)).fetchall()
+    conn.close()
+    return render_template('profile.html', user=user, is_owner=(user['id'] == current_user.id),
+                           show_activity=show_activity, can_view_activity=can_view, activity=activity)
+
+
+@app.route('/me/pantry')
+@login_required
+def my_pantry():
+    query = request.args.get('q', '').strip()
+    conn = get_db()
+    owner = conn.execute('SELECT * FROM users WHERE id = ?', (current_user.id,)).fetchone()
+    user_products = conn.execute('''
+        SELECT up.id, up.state, up.notes, p.name, c.name as category_name
+        FROM user_products up
+        JOIN products p ON up.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE up.user_id = ?
+        ORDER BY p.name
+    ''', (current_user.id,)).fetchall()
+    has_products_to_buy = any(up['state'] in (2, 3) for up in user_products)
+    params = [current_user.id]
+    catalog_query = '''
+        SELECT p.id, p.name, c.name as category_name
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.id NOT IN (SELECT product_id FROM user_products WHERE user_id = ?)
+    '''
+    if query:
+        catalog_query += ' AND p.name LIKE ?'
+        params.append(f'%{query}%')
+    catalog_query += ' ORDER BY p.name LIMIT 100'
+    catalog = conn.execute(catalog_query, params).fetchall()
+    conn.close()
+    return render_template(
+        'user_pantry.html',
+        owner=owner,
+        can_edit=True,
+        user_products=user_products,
+        catalog=catalog,
+        query=query,
+        has_products_to_buy=has_products_to_buy
+    )
+
+
+@app.route('/user/<username>/pantry')
+@login_required
+def user_pantry(username):
+    conn = get_db()
+    owner = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    if not owner:
+        conn.close()
+        abort(404)
+    user_products = conn.execute('''
+        SELECT up.id, up.state, up.notes, p.name, c.name as category_name
+        FROM user_products up
+        JOIN products p ON up.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE up.user_id = ?
+        ORDER BY p.name
+    ''', (owner['id'],)).fetchall()
+    catalog = []
+    conn.close()
+    return render_template(
+        'user_pantry.html',
+        owner=owner,
+        can_edit=(owner['id'] == current_user.id),
+        user_products=user_products,
+        catalog=catalog,
+        query='',
+        has_products_to_buy=any(up['state'] in (2, 3) for up in user_products)
+    )
+
+
+@app.route('/me/pantry/board')
+@login_required
+def my_pantry_board():
+    conn = get_db()
+    owner = conn.execute('SELECT * FROM users WHERE id = ?', (current_user.id,)).fetchone()
+    user_products = conn.execute('''
+        SELECT up.id, up.state, up.notes, p.name, c.name as category_name
+        FROM user_products up
+        JOIN products p ON up.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE up.user_id = ?
+        ORDER BY p.name
+    ''', (current_user.id,)).fetchall()
+    categories = conn.execute('SELECT * FROM categories ORDER BY name').fetchall()
+    products = conn.execute('SELECT id, name FROM products ORDER BY name').fetchall()
+    conn.close()
+    groups = {
+        'in_stock': [up for up in user_products if up['state'] == 1],
+        'low': [up for up in user_products if up['state'] == 2],
+        'none': [up for up in user_products if up['state'] == 3],
+    }
+    return render_template(
+        'user_pantry_board.html',
+        owner=owner,
+        can_edit=True,
+        groups=groups,
+        categories=categories,
+        products=products
+    )
+
+
+@app.route('/user/<username>/pantry/board')
+@login_required
+def user_pantry_board(username):
+    conn = get_db()
+    owner = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+    if not owner:
+        conn.close()
+        abort(404)
+    user_products = conn.execute('''
+        SELECT up.id, up.state, up.notes, p.name, c.name as category_name
+        FROM user_products up
+        JOIN products p ON up.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE up.user_id = ?
+        ORDER BY p.name
+    ''', (owner['id'],)).fetchall()
+    categories = conn.execute('SELECT * FROM categories ORDER BY name').fetchall()
+    products = conn.execute('SELECT id, name FROM products ORDER BY name').fetchall()
+    conn.close()
+    groups = {
+        'in_stock': [up for up in user_products if up['state'] == 1],
+        'low': [up for up in user_products if up['state'] == 2],
+        'none': [up for up in user_products if up['state'] == 3],
+    }
+    return render_template(
+        'user_pantry_board.html',
+        owner=owner,
+        can_edit=(owner['id'] == current_user.id),
+        groups=groups,
+        categories=categories,
+        products=products
+    )
+
+
+@app.route('/me/pantry/board/add', methods=['POST'])
+@login_required
+def pantry_board_add():
+    name = (request.form.get('name') or '').strip()
+    if not name:
+        flash('Введите название продукта', 'danger')
+        return redirect(url_for('my_pantry_board'))
+    category_id = request.form.get('category_id', type=int)
+    state = request.form.get('state', type=int) or 1
+    if state not in (1, 2, 3):
+        state = 1
+    conn = get_db()
+    product = conn.execute('SELECT id, category_id FROM products WHERE name = ?', (name,)).fetchone()
+    if product:
+        product_id = product['id']
+        if category_id and (product['category_id'] is None):
+            conn.execute('UPDATE products SET category_id = ? WHERE id = ?', (category_id, product_id))
+    else:
+        conn.execute('INSERT INTO products (name, category_id) VALUES (?, ?)', (name, category_id))
+        product_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    conn.execute(
+        'INSERT OR IGNORE INTO user_products (user_id, product_id, state) VALUES (?, ?, ?)',
+        (current_user.id, product_id, state)
+    )
+    conn.execute(
+        'UPDATE user_products SET state = ? WHERE user_id = ? AND product_id = ?',
+        (state, current_user.id, product_id)
+    )
+    conn.commit()
+    conn.close()
+    log_pantry_activity(current_user.id, product_id, 'add', None, state, 'added_to_board')
+    flash('Продукт добавлен на доску', 'success')
+    return redirect(url_for('my_pantry_board'))
+
+
+@app.route('/me/pantry/add', methods=['POST'])
+@login_required
+def pantry_add():
+    product_id = request.form.get('product_id', type=int)
+    if not product_id:
+        flash('Не выбран продукт', 'danger')
+        return redirect(url_for('my_pantry'))
+    conn = get_db()
+    try:
+        conn.execute(
+            'INSERT OR IGNORE INTO user_products (user_id, product_id, state) VALUES (?, ?, ?)',
+            (current_user.id, product_id, 1)
+        )
+        conn.commit()
+        flash('Продукт добавлен в шаблон', 'success')
+    finally:
+        conn.close()
+    log_pantry_activity(current_user.id, product_id, 'add', None, 1, 'added_from_table')
+    return redirect(url_for('my_pantry'))
+
+
+@app.route('/me/pantry/<int:user_product_id>/state', methods=['POST'])
+@login_required
+def pantry_set_state(user_product_id):
+    state = request.form.get('state', type=int)
+    if state not in (1, 2, 3):
+        flash('Неверное состояние', 'danger')
+        return redirect(url_for('my_pantry'))
+    conn = get_db()
+    try:
+        row = conn.execute(
+            'SELECT state, product_id FROM user_products WHERE id = ? AND user_id = ?',
+            (user_product_id, current_user.id)
+        ).fetchone()
+        if not row:
+            conn.close()
+            flash('Продукт не найден', 'danger')
+            return redirect(url_for('my_pantry'))
+        old_state = row['state']
+        conn.execute(
+            'UPDATE user_products SET state = ? WHERE id = ? AND user_id = ?',
+            (state, user_product_id, current_user.id)
+        )
+        conn.commit()
+        if old_state != state:
+            log_pantry_activity(current_user.id, row['product_id'], 'move', old_state, state, 'state_changed')
+    except sqlite3.OperationalError:
+        conn.rollback()
+        flash('База данных временно занята, попробуйте ещё раз', 'danger')
+    finally:
+        conn.close()
+    return redirect(url_for('my_pantry'))
+
+
+@app.route('/me/pantry/<int:user_product_id>/remove', methods=['POST'])
+@login_required
+def pantry_remove(user_product_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            'SELECT product_id, state FROM user_products WHERE id = ? AND user_id = ?',
+            (user_product_id, current_user.id)
+        ).fetchone()
+        if not row:
+            conn.close()
+            flash('Продукт не найден', 'danger')
+            return redirect(url_for('my_pantry'))
+        conn.execute('DELETE FROM user_product_comments WHERE user_product_id = ?', (user_product_id,))
+        conn.execute('DELETE FROM user_products WHERE id = ? AND user_id = ?', (user_product_id, current_user.id))
+        conn.commit()
+        flash('Продукт удалён из шаблона', 'info')
+        log_pantry_activity(current_user.id, row['product_id'], 'remove', row['state'], None, 'removed_from_template')
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        flash('Не удалось удалить продукт из-за связей в базе данных', 'danger')
+    finally:
+        conn.close()
+    return redirect(url_for('my_pantry'))
+
+
+@app.route('/me/pantry/create-list', methods=['POST'])
+@login_required
+def pantry_create_list():
+    conn = get_db()
+    to_buy = conn.execute('''
+        SELECT p.name
+        FROM user_products up
+        JOIN products p ON up.product_id = p.id
+        WHERE up.user_id = ? AND up.state IN (2, 3)
+        ORDER BY p.name
+    ''', (current_user.id,)).fetchall()
+    if not to_buy:
+        conn.close()
+        flash('Нет товаров, которые нужно купить', 'info')
+        return redirect(url_for('my_pantry'))
+    list_name = 'Список из шаблона'
+    conn.execute('INSERT INTO lists (name, owner_id) VALUES (?, ?)', (list_name, current_user.id))
+    new_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    for row in to_buy:
+        conn.execute(
+            'INSERT INTO items (list_id, name, quantity) VALUES (?, ?, ?)',
+            (new_id, row['name'], 1)
+        )
+    conn.commit()
+    conn.close()
+    flash('Создан новый список из шаблона', 'success')
+    return redirect(url_for('list_view', list_id=new_id))
+
+
+@app.route('/me/pantry/item/<int:user_product_id>', methods=['GET', 'POST'])
+@login_required
+def pantry_item(user_product_id):
+    conn = get_db()
+    up = conn.execute('SELECT * FROM user_products WHERE id = ? AND user_id = ?', (user_product_id, current_user.id)).fetchone()
+    if not up:
+        conn.close()
+        abort(404)
+    if request.method == 'POST':
+        text = (request.form.get('text') or '').strip()
+        if text:
+            conn.execute(
+                'INSERT INTO user_product_comments (user_product_id, user_id, text) VALUES (?, ?, ?)',
+                (user_product_id, current_user.id, text)
+            )
+            conn.commit()
+        conn.close()
+        return redirect(url_for('pantry_item', user_product_id=user_product_id))
+    product = conn.execute('SELECT name, category_id FROM products WHERE id = ?', (up['product_id'],)).fetchone()
+    category_name_row = None
+    if product and product['category_id']:
+        category_name_row = conn.execute('SELECT name FROM categories WHERE id = ?', (product['category_id'],)).fetchone()
+    comments = conn.execute('''
+        SELECT c.text, c.created_at, u.username
+        FROM user_product_comments c
+        JOIN users u ON c.user_id = u.id
+        WHERE c.user_product_id = ?
+        ORDER BY c.created_at DESC
+    ''', (user_product_id,)).fetchall()
+    conn.close()
+    return render_template(
+        'user_pantry_item.html',
+        up=up,
+        product=product,
+        category_name=category_name_row['name'] if category_name_row else None,
+        comments=comments
+    )
 
 # === REST API ===
 def api_login_required(f):

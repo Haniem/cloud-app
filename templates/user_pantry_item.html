@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — продукт{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}" class="text-white">Списки</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('my_pantry_board') }}" class="text-white">Продукты дома</a></li>
+                    <li class="breadcrumb-item active text-white" aria-current="page">{{ product.name }}</li>
+                </ol>
+            </nav>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>{{ product.name }}</strong>
+                    {% if category_name %}
+                    <span class="badge bg-light text-muted border ms-1">{{ category_name }}</span>
+                    {% endif %}
+                    <div class="small text-muted">
+                        Статус:
+                        {% if up.state == 1 %}Есть дома{% elif up.state == 2 %}Осталось мало{% else %}Отсутствует{% endif %}
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <form action="{{ url_for('pantry_remove', user_product_id=up.id) }}" method="post"
+                          onsubmit="return confirm('Убрать продукт из шаблона?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить из шаблона</button>
+                    </form>
+                    <a href="{{ url_for('my_pantry_board') }}" class="btn btn-sm btn-outline-secondary">Назад к доске</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <h6>Комментарии к продукту</h6>
+                {% if comments %}
+                <div class="mb-3" style="max-height: 260px; overflow-y: auto;">
+                    <ul class="list-unstyled mb-0">
+                        {% for c in comments %}
+                        <li class="mb-2">
+                            <div class="small">
+                                <strong>{{ c.username }}</strong>
+                                <span class="text-muted">· {{ c.created_at }}</span>
+                            </div>
+                            <div>{{ c.text }}</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% else %}
+                <p class="text-muted small">Пока нет комментариев. Добавьте первый — например, «Брать только 7,5% творог».</p>
+                {% endif %}
+
+                <form action="{{ url_for('pantry_item', user_product_id=up.id) }}" method="post">
+                    <div class="mb-2">
+                        <label for="comment-text" class="form-label small text-muted">Новый комментарий</label>
+                        <textarea id="comment-text" name="text" rows="3" class="form-control" required
+                                  placeholder="Напишите подсказку для семьи: на что обратить внимание при покупке"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Добавить комментарий</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

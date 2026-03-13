@@ -35,6 +35,12 @@
                     <form action="{{ url_for('list_duplicate', list_id=lst.id) }}" method="post" class="d-inline">
                         <button type="submit" class="btn btn-sm btn-outline-secondary" title="Копировать"><i class="bi bi-copy"></i></button>
                     </form>
+                    <form action="{{ url_for('list_save_template', list_id=lst.id) }}" method="post" class="d-inline">
+                        <input type="hidden" name="template_name" value="{{ lst.name }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Сохранить как шаблон">
+                            <i class="bi bi-bookmark-plus"></i>
+                        </button>
+                    </form>
                     {% endif %}
                 </div>
             </div>

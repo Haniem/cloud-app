@@ -1,0 +1,332 @@
+{% extends "base.html" %}
+{% block title %}Продукты дома{% endblock %}
+{% block head %}
+<style>
+    .pantry-section-title {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .pantry-card {
+        border-radius: 0.75rem;
+        border: none;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    .pantry-chip {
+        border-radius: 1rem;
+        padding: 0.5rem 0.9rem;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.35rem;
+        cursor: grab;
+        min-width: 150px;
+    }
+    .pantry-chip-state-1 {
+        background: rgba(25,135,84,0.9);
+        color: #fff;
+    }
+    .pantry-chip-state-2 {
+        background: rgba(255,193,7,0.93);
+        color: #212529;
+    }
+    .pantry-chip-state-3 {
+        background: rgba(220,53,69,0.9);
+        color: #fff;
+    }
+    .pantry-chip-category {
+        font-size: 0.7rem;
+    }
+    .pantry-section-body {
+        min-height: 120px;
+    }
+    .pantry-column {
+        display: flex;
+    }
+    .pantry-card.h-100 {
+        display: flex;
+        flex-direction: column;
+    }
+    .pantry-card .card-body.pantry-section-body {
+        flex: 1 1 auto;
+    }
+    .pantry-toolbar {
+        border-radius: 0.9rem;
+        background: #ffffff;
+        box-shadow: 0 6px 24px rgba(15, 23, 42, 0.16);
+        padding: 0.75rem 1rem 1rem;
+    }
+    .pantry-toolbar .form-control,
+    .pantry-toolbar .form-select {
+        border-radius: 0.6rem;
+    }
+    .pantry-status-select {
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+    .pantry-status-1 {
+        background-color: rgba(25,135,84,0.12);
+        border-color: rgba(25,135,84,0.4);
+        color: #155724;
+    }
+    .pantry-status-2 {
+        background-color: rgba(255,193,7,0.16);
+        border-color: rgba(255,193,7,0.6);
+        color: #7c5a00;
+    }
+    .pantry-status-3 {
+        background-color: rgba(220,53,69,0.16);
+        border-color: rgba(220,53,69,0.5);
+        color: #842029;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <nav aria-label="breadcrumb" class="d-flex align-items-center gap-2 flex-wrap">
+                <ol class="breadcrumb mb-0 me-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Списки</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Продукты дома</li>
+                </ol>
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        id="copy-share-link-btn"
+                        data-share-url="{{ url_for('user_pantry_board', username=owner.username, _external=true) }}">
+                    Поделиться
+                </button>
+            </nav>
+            <div class="d-flex gap-2 flex-wrap">
+                {% if can_edit %}
+                <a href="{{ url_for('my_pantry') }}" class="btn btn-sm btn-outline-light">Табличный вид</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if can_edit %}
+        <div class="pantry-toolbar mb-3">
+            <div class="mb-1 small text-muted">Добавьте продукт в шаблон</div>
+                <form class="row g-2 align-items-center" method="post" action="{{ url_for('pantry_board_add') }}">
+                    <div class="col-12 col-md-6 col-lg-5">
+                        <input type="text" name="name" id="pantry-product-name" list="products-list"
+                               class="form-control form-control-sm"
+                               placeholder="Новый продукт (например, Молоко 3,2%)" autocomplete="off" required>
+                        <datalist id="products-list">
+                            {% for p in products %}
+                            <option value="{{ p.name }}"></option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <select name="category_id" class="form-select form-select-sm">
+                            <option value="">Категория</option>
+                            {% for c in categories %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-3 col-lg-2">
+                        <select name="state" id="pantry-status-select" class="form-select form-select-sm pantry-status-select">
+                            <option value="1">Есть дома</option>
+                            <option value="2">Осталось мало</option>
+                            <option value="3">Отсутствует</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-3">
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Добавить в доску</button>
+                    </div>
+                </form>
+                <p class="text-muted small mb-0 mt-1">
+                    Продукт будет добавлен в ваш шаблон и появится в соответствующей секции.
+                </p>
+        </div>
+        {% endif %}
+
+        <div class="row g-2">
+            <div class="col-12 col-lg-4 pantry-column">
+                <div class="card pantry-card h-100" style="background: rgba(25,135,84,0.12);">
+                    <div class="card-header border-0 pb-1">
+                        <div class="pantry-section-title text-success">Есть дома</div>
+                        <div class="small text-muted">Товары, которых достаточно</div>
+                    </div>
+                    <div class="card-body pantry-section-body pantry-dropzone" data-target-state="1">
+                        {% if groups.in_stock %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for up in groups.in_stock %}
+                            <div class="pantry-chip pantry-chip-state-1 {% if can_edit %}pantry-draggable{% endif %}"
+                                 {% if can_edit %}draggable="true" data-id="{{ up.id }}" data-state="1"{% endif %}>
+                                <div>
+                                    {% if can_edit %}
+                                    <a href="{{ url_for('pantry_item', user_product_id=up.id) }}" class="text-white text-decoration-none fw-semibold">
+                                        {{ up.name }}
+                                    </a>
+                                    {% else %}
+                                    <span class="fw-semibold">{{ up.name }}</span>
+                                    {% endif %}
+                                    {% if up.category_name %}
+                                    <div class="pantry-chip-category">{{ up.category_name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">Пока ничего. Добавьте продукты, которые обычно есть дома.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4 pantry-column">
+                <div class="card pantry-card h-100" style="background: rgba(255,193,7,0.18);">
+                    <div class="card-header border-0 pb-1">
+                        <div class="pantry-section-title text-warning">Осталось мало</div>
+                        <div class="small text-muted">Скоро нужно будет докупить</div>
+                    </div>
+                    <div class="card-body pantry-section-body pantry-dropzone" data-target-state="2">
+                        {% if groups.low %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for up in groups.low %}
+                            <div class="pantry-chip pantry-chip-state-2 {% if can_edit %}pantry-draggable{% endif %}"
+                                 {% if can_edit %}draggable="true" data-id="{{ up.id }}" data-state="2"{% endif %}>
+                                <div>
+                                    {% if can_edit %}
+                                    <a href="{{ url_for('pantry_item', user_product_id=up.id) }}" class="text-dark text-decoration-none fw-semibold">
+                                        {{ up.name }}
+                                    </a>
+                                    {% else %}
+                                    <span class="fw-semibold">{{ up.name }}</span>
+                                    {% endif %}
+                                    {% if up.category_name %}
+                                    <div class="pantry-chip-category">{{ up.category_name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">Здесь будут товары, которые подходят к концу.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4 pantry-column">
+                <div class="card pantry-card h-100" style="background: rgba(220,53,69,0.18);">
+                    <div class="card-header border-0 pb-1">
+                        <div class="pantry-section-title text-danger">Отсутствуют</div>
+                        <div class="small text-muted">Нужно купить</div>
+                    </div>
+                    <div class="card-body pantry-section-body pantry-dropzone" data-target-state="3">
+                        {% if groups.none %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for up in groups.none %}
+                            <div class="pantry-chip pantry-chip-state-3 {% if can_edit %}pantry-draggable{% endif %}"
+                                 {% if can_edit %}draggable="true" data-id="{{ up.id }}" data-state="3"{% endif %}>
+                                <div>
+                                    {% if can_edit %}
+                                    <a href="{{ url_for('pantry_item', user_product_id=up.id) }}" class="text-white text-decoration-none fw-semibold">
+                                        {{ up.name }}
+                                    </a>
+                                    {% else %}
+                                    <span class="fw-semibold">{{ up.name }}</span>
+                                    {% endif %}
+                                    {% if up.category_name %}
+                                    <div class="pantry-chip-category">{{ up.category_name }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small mb-0">Супер! Здесь нет товаров — ничего не забыто.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info small mt-3">
+            Поделитесь ссылкой на эту страницу с семьёй, чтобы всем было видно, какие продукты дома есть,
+            заканчиваются или закончились.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% if can_edit %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    let draggedId = null;
+
+    document.querySelectorAll('.pantry-draggable').forEach(function (el) {
+        el.addEventListener('dragstart', function (e) {
+            draggedId = el.getAttribute('data-id');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+    });
+
+    document.querySelectorAll('.pantry-dropzone').forEach(function (zone) {
+        zone.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        zone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (!draggedId) return;
+            const targetState = zone.getAttribute('data-target-state');
+            if (!targetState) return;
+            fetch('/me/pantry/' + encodeURIComponent(draggedId) + '/state', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: 'state=' + encodeURIComponent(targetState)
+            }).then(function () {
+                window.location.reload();
+            }).catch(function () {
+                window.location.reload();
+            });
+        });
+    });
+
+    const statusSelect = document.getElementById('pantry-status-select');
+    const applyStatusClass = function () {
+        if (!statusSelect) return;
+        statusSelect.classList.remove('pantry-status-1', 'pantry-status-2', 'pantry-status-3');
+        const v = statusSelect.value;
+        if (v === '1') statusSelect.classList.add('pantry-status-1');
+        else if (v === '2') statusSelect.classList.add('pantry-status-2');
+        else if (v === '3') statusSelect.classList.add('pantry-status-3');
+    };
+    if (statusSelect) {
+        applyStatusClass();
+        statusSelect.addEventListener('change', applyStatusClass);
+    }
+
+    const shareBtn = document.getElementById('copy-share-link-btn');
+    if (shareBtn && shareBtn.dataset.shareUrl) {
+        shareBtn.addEventListener('click', function () {
+            const url = shareBtn.dataset.shareUrl;
+            const tmp = document.createElement('textarea');
+            tmp.value = url;
+            document.body.appendChild(tmp);
+            tmp.select();
+            tmp.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                shareBtn.textContent = 'Скопировано';
+                setTimeout(function () {
+                    shareBtn.textContent = 'Поделиться';
+                }, 1500);
+            } catch (e) {}
+            document.body.removeChild(tmp);
+        });
+    }
+});
+</script>
+{% endif %}
+{% endblock %}
+
+

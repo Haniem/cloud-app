@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Профиль {{ user.username }}{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Главная</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Профиль</li>
+                </ol>
+            </nav>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title mb-2">{{ user.username }}</h5>
+                        <p class="mb-1 small text-muted">Email: {{ user.email }}</p>
+                        <p class="mb-3 small text-muted">Зарегистрирован: {{ user.created_at }}</p>
+                        {% if is_owner %}
+                        <form method="post">
+                            <input type="hidden" name="action" value="privacy">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="showActivitySwitch"
+                                       name="show_activity" value="1" {% if show_activity %}checked{% endif %}>
+                                <label class="form-check-label" for="showActivitySwitch">
+                                    Разрешить другим видеть историю активности
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Сохранить</button>
+                        </form>
+                        {% else %}
+                        <p class="small text-muted mb-0">
+                            История активности: {% if show_activity %}открыта для просмотра{% else %}скрыта пользователем{% endif %}.
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>История активности с продуктами</strong>
+                    </div>
+                    <div class="card-body">
+                        {% if can_view_activity and activity %}
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                <tr>
+                                    <th>Время</th>
+                                    <th>Продукт</th>
+                                    <th>Действие</th>
+                                    <th>Из</th>
+                                    <th>В</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for a in activity %}
+                                <tr>
+                                    <td class="small text-muted">{{ a.created_at }}</td>
+                                    <td>{{ a.product_name }}</td>
+                                    <td>
+                                        {% if a.action == 'add' %}Добавлен{% elif a.action == 'move' %}Перемещён{% elif a.action == 'remove' %}Удалён{% else %}{{ a.action }}{% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% if a.from_state == 1 %}Есть дома{% elif a.from_state == 2 %}Осталось мало{% elif a.from_state == 3 %}Отсутствует{% else %}—{% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% if a.to_state == 1 %}Есть дома{% elif a.to_state == 2 %}Осталось мало{% elif a.to_state == 3 %}Отсутствует{% else %}—{% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% elif can_view_activity %}
+                        <p class="text-muted small mb-0">Пока нет записей об активности.</p>
+                        {% else %}
+                        <p class="text-muted small mb-0">Пользователь скрыл историю активности.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
