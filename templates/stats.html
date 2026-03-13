@@ -23,7 +23,7 @@
                     </div>
                 </div>
             </div>
-            <h6>По категориям</h6>
+            <h6>По категориям (списки покупок)</h6>
             <ul class="list-group list-group-flush">
                 {% for c in by_category %}
                 <li class="list-group-item d-flex justify-content-between">
@@ -34,6 +34,47 @@
                 <li class="list-group-item text-muted">Нет данных</li>
                 {% endfor %}
             </ul>
+            <hr class="my-4">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <h6 class="mb-2">Состояние «продуктов дома»</h6>
+                    {% if pantry_totals %}
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Есть дома</span>
+                            <span class="badge bg-success rounded-pill">{{ pantry_totals.in_stock or 0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Осталось мало</span>
+                            <span class="badge bg-warning text-dark rounded-pill">{{ pantry_totals.low or 0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Отсутствуют</span>
+                            <span class="badge bg-danger rounded-pill">{{ pantry_totals.none or 0 }}</span>
+                        </li>
+                    </ul>
+                    {% else %}
+                    <p class="text-muted small mb-0">Нет данных по продуктам дома.</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <h6 class="mb-2">Активность с продуктами дома</h6>
+                    {% if pantry_activity_counts %}
+                    <ul class="list-group list-group-flush">
+                        {% for a in pantry_activity_counts %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>
+                                {% if a.action == 'add' %}Добавления{% elif a.action == 'move' %}Перемещения{% elif a.action == 'remove' %}Удаления{% else %}{{ a.action }}{% endif %}
+                            </span>
+                            <span class="badge bg-secondary rounded-pill">{{ a.cnt }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted small mb-0">Активность ещё не зафиксирована.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>

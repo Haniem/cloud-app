@@ -821,21 +821,29 @@ def list_from_template(template_id):
 @login_required
 def search():
     q = request.args.get('q', '').strip()
-    if not q:
-        return render_template('search.html', results=[], query='')
     conn = get_db()
-    q_pattern = f'%{q}%'
-    results = conn.execute('''
-        SELECT i.*, l.name as list_name, l.id as list_id, c.name as category_name
+    suggestions = conn.execute('''
+        SELECT DISTINCT i.name
         FROM items i
         JOIN lists l ON i.list_id = l.id
-        LEFT JOIN categories c ON i.category_id = c.id
-        WHERE (i.name LIKE ? OR i.notes LIKE ?)
-        AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
-        ORDER BY l.name, i.name
-    ''', (q_pattern, q_pattern, current_user.id, current_user.id)).fetchall()
+        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+        ORDER BY i.name
+        LIMIT 200
+    ''', (current_user.id, current_user.id)).fetchall()
+    results = []
+    if q:
+        q_pattern = f'%{q}%'
+        results = conn.execute('''
+            SELECT i.*, l.name as list_name, l.id as list_id, c.name as category_name
+            FROM items i
+            JOIN lists l ON i.list_id = l.id
+            LEFT JOIN categories c ON i.category_id = c.id
+            WHERE (i.name LIKE ? OR i.notes LIKE ?)
+            AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+            ORDER BY l.name, i.name
+        ''', (q_pattern, q_pattern, current_user.id, current_user.id)).fetchall()
     conn.close()
-    return render_template('search.html', results=results, query=q)
+    return render_template('search.html', results=results, query=q, suggestions=suggestions)
 
 
 @app.route('/list/<int:list_id>/export')
@@ -885,46 +893,6 @@ def list_print(list_id):
     return render_template('list_print.html', lst=lst, items=items, now=datetime.now())
 
 
-@app.route('/history')
-@login_required
-def history():
-    conn = get_db()
-    bought = conn.execute('''
-        SELECT i.name, i.quantity, i.bought_at, l.name as list_name, l.id as list_id
-        FROM items i
-        JOIN lists l ON i.list_id = l.id
-        WHERE i.bought = 1 AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
-        ORDER BY i.bought_at DESC
-        LIMIT 100
-    ''', (current_user.id, current_user.id)).fetchall()
-    conn.close()
-    return render_template('history.html', items=bought)
-
-
-@app.route('/stats')
-@login_required
-def stats():
-    conn = get_db()
-    total_items = conn.execute('''
-        SELECT COUNT(*) as c FROM items i
-        JOIN lists l ON i.list_id = l.id
-        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
-    ''', (current_user.id, current_user.id)).fetchone()['c']
-    bought_count = conn.execute('''
-        SELECT COUNT(*) as c FROM items i
-        JOIN lists l ON i.list_id = l.id
-        WHERE i.bought = 1 AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
-    ''', (current_user.id, current_user.id)).fetchone()['c']
-    by_category = conn.execute('''
-        SELECT c.name, COUNT(*) as cnt FROM items i
-        JOIN lists l ON i.list_id = l.id
-        LEFT JOIN categories c ON i.category_id = c.id
-        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
-        GROUP BY c.name
-        ORDER BY cnt DESC
-    ''', (current_user.id, current_user.id)).fetchall()
-    conn.close()
-    return render_template('stats.html', total_items=total_items, bought_count=bought_count, by_category=by_category)
 
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -996,9 +964,45 @@ def my_profile():
         ORDER BY a.created_at DESC
         LIMIT 200
     ''', (current_user.id,)).fetchall()
+    total_items = conn.execute('''
+        SELECT COUNT(*) as c FROM items i
+        JOIN lists l ON i.list_id = l.id
+        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+    ''', (current_user.id, current_user.id)).fetchone()['c']
+    bought_count = conn.execute('''
+        SELECT COUNT(*) as c FROM items i
+        JOIN lists l ON i.list_id = l.id
+        WHERE i.bought = 1 AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+    ''', (current_user.id, current_user.id)).fetchone()['c']
+    by_category = conn.execute('''
+        SELECT c.name, COUNT(*) as cnt FROM items i
+        JOIN lists l ON i.list_id = l.id
+        LEFT JOIN categories c ON i.category_id = c.id
+        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+        GROUP BY c.name
+        ORDER BY cnt DESC
+    ''', (current_user.id, current_user.id)).fetchall()
+    pantry_totals = conn.execute('''
+        SELECT
+            SUM(CASE WHEN up.state = 1 THEN 1 ELSE 0 END) as in_stock,
+            SUM(CASE WHEN up.state = 2 THEN 1 ELSE 0 END) as low,
+            SUM(CASE WHEN up.state = 3 THEN 1 ELSE 0 END) as none
+        FROM user_products up
+        WHERE up.user_id = ?
+    ''', (current_user.id,)).fetchone()
+    history_items = conn.execute('''
+        SELECT i.name, i.quantity, i.bought_at, l.name as list_name, l.id as list_id
+        FROM items i
+        JOIN lists l ON i.list_id = l.id
+        WHERE i.bought = 1 AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+        ORDER BY i.bought_at DESC
+        LIMIT 100
+    ''', (current_user.id, current_user.id)).fetchall()
     conn.close()
     return render_template('profile.html', user=user, is_owner=True, show_activity=show_activity,
-                           can_view_activity=True, activity=activity)
+                           can_view_activity=True, activity=activity,
+                           total_items=total_items, bought_count=bought_count, by_category=by_category,
+                           pantry_totals=pantry_totals, history_items=history_items)
 
 
 @app.route('/user/<username>/profile')
@@ -1022,9 +1026,45 @@ def user_profile(username):
             ORDER BY a.created_at DESC
             LIMIT 200
         ''', (user['id'],)).fetchall()
+    total_items = conn.execute('''
+        SELECT COUNT(*) as c FROM items i
+        JOIN lists l ON i.list_id = l.id
+        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+    ''', (user['id'], user['id'])).fetchone()['c']
+    bought_count = conn.execute('''
+        SELECT COUNT(*) as c FROM items i
+        JOIN lists l ON i.list_id = l.id
+        WHERE i.bought = 1 AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+    ''', (user['id'], user['id'])).fetchone()['c']
+    by_category = conn.execute('''
+        SELECT c.name, COUNT(*) as cnt FROM items i
+        JOIN lists l ON i.list_id = l.id
+        LEFT JOIN categories c ON i.category_id = c.id
+        WHERE (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+        GROUP BY c.name
+        ORDER BY cnt DESC
+    ''', (user['id'], user['id'])).fetchall()
+    pantry_totals = conn.execute('''
+        SELECT
+            SUM(CASE WHEN up.state = 1 THEN 1 ELSE 0 END) as in_stock,
+            SUM(CASE WHEN up.state = 2 THEN 1 ELSE 0 END) as low,
+            SUM(CASE WHEN up.state = 3 THEN 1 ELSE 0 END) as none
+        FROM user_products up
+        WHERE up.user_id = ?
+    ''', (user['id'],)).fetchone()
+    history_items = conn.execute('''
+        SELECT i.name, i.quantity, i.bought_at, l.name as list_name, l.id as list_id
+        FROM items i
+        JOIN lists l ON i.list_id = l.id
+        WHERE i.bought = 1 AND (l.owner_id = ? OR EXISTS (SELECT 1 FROM list_shares WHERE list_id = l.id AND user_id = ?))
+        ORDER BY i.bought_at DESC
+        LIMIT 100
+    ''', (user['id'], user['id'])).fetchall()
     conn.close()
     return render_template('profile.html', user=user, is_owner=(user['id'] == current_user.id),
-                           show_activity=show_activity, can_view_activity=can_view, activity=activity)
+                           show_activity=show_activity, can_view_activity=can_view, activity=activity,
+                           total_items=total_items, bought_count=bought_count, by_category=by_category,
+                           pantry_totals=pantry_totals, history_items=history_items)
 
 
 @app.route('/me/pantry')
@@ -1110,6 +1150,8 @@ def my_pantry_board():
     ''', (current_user.id,)).fetchall()
     categories = conn.execute('SELECT * FROM categories ORDER BY name').fetchall()
     products = conn.execute('SELECT id, name FROM products ORDER BY name').fetchall()
+    active_list = conn.execute('SELECT id, name FROM lists WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1',
+                               (current_user.id,)).fetchone()
     conn.close()
     groups = {
         'in_stock': [up for up in user_products if up['state'] == 1],
@@ -1122,7 +1164,8 @@ def my_pantry_board():
         can_edit=True,
         groups=groups,
         categories=categories,
-        products=products
+        products=products,
+        active_list=active_list
     )
 
 
@@ -1144,6 +1187,8 @@ def user_pantry_board(username):
     ''', (owner['id'],)).fetchall()
     categories = conn.execute('SELECT * FROM categories ORDER BY name').fetchall()
     products = conn.execute('SELECT id, name FROM products ORDER BY name').fetchall()
+    active_list = conn.execute('SELECT id, name FROM lists WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1',
+                               (owner['id'],)).fetchone()
     conn.close()
     groups = {
         'in_stock': [up for up in user_products if up['state'] == 1],
@@ -1156,7 +1201,8 @@ def user_pantry_board(username):
         can_edit=(owner['id'] == current_user.id),
         groups=groups,
         categories=categories,
-        products=products
+        products=products,
+        active_list=active_list
     )
 
 
@@ -1304,6 +1350,45 @@ def pantry_create_list():
     return redirect(url_for('list_view', list_id=new_id))
 
 
+@app.route('/me/pantry/item/<int:user_product_id>/add-to-list', methods=['POST'])
+@login_required
+def pantry_item_add_to_list(user_product_id):
+    list_id = request.form.get('list_id', type=int)
+    conn = get_db()
+    up = conn.execute('''
+        SELECT up.state, up.product_id, p.name
+        FROM user_products up
+        JOIN products p ON up.product_id = p.id
+        WHERE up.id = ? AND up.user_id = ?
+    ''', (user_product_id, current_user.id)).fetchone()
+    if not up:
+        conn.close()
+        flash('Продукт не найден', 'danger')
+        return redirect(url_for('my_pantry_board'))
+    if up['state'] not in (2, 3):
+        conn.close()
+        flash('Добавлять в список можно только товары с состоянием «Осталось мало» или «Отсутствует»', 'warning')
+        return redirect(url_for('pantry_item', user_product_id=user_product_id))
+    target_list = None
+    if list_id:
+        target_list = conn.execute('SELECT id, owner_id FROM lists WHERE id = ?', (list_id,)).fetchone()
+        if not target_list or target_list['owner_id'] != current_user.id:
+            conn.close()
+            flash('Список не найден или не принадлежит вам', 'danger')
+            return redirect(url_for('pantry_item', user_product_id=user_product_id))
+    else:
+        conn.execute('INSERT INTO lists (name, owner_id) VALUES (?, ?)', ('Список из профиля', current_user.id))
+        list_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+    conn.execute(
+        'INSERT INTO items (list_id, name, quantity) VALUES (?, ?, ?)',
+        (list_id, up['name'], 1)
+    )
+    conn.commit()
+    conn.close()
+    flash('Товар добавлен в список покупок', 'success')
+    return redirect(url_for('list_view', list_id=list_id))
+
+
 @app.route('/me/pantry/item/<int:user_product_id>', methods=['GET', 'POST'])
 @login_required
 def pantry_item(user_product_id):
@@ -1333,13 +1418,16 @@ def pantry_item(user_product_id):
         WHERE c.user_product_id = ?
         ORDER BY c.created_at DESC
     ''', (user_product_id,)).fetchall()
+    active_list = conn.execute('SELECT id, name FROM lists WHERE owner_id = ? ORDER BY created_at DESC LIMIT 1',
+                               (current_user.id,)).fetchone()
     conn.close()
     return render_template(
         'user_pantry_item.html',
         up=up,
         product=product,
         category_name=category_name_row['name'] if category_name_row else None,
-        comments=comments
+        comments=comments,
+        active_list=active_list
     )
 
 # === REST API ===

@@ -34,6 +34,28 @@
                 </div>
             </div>
             <div class="card-body">
+                {% if up.state in [2, 3] %}
+                <div class="mb-3">
+                    <form action="{{ url_for('pantry_item_add_to_list', user_product_id=up.id) }}" method="post" class="row g-2 align-items-center">
+                        <div class="col-12 col-md-8">
+                            {% if active_list %}
+                            <select name="list_id" class="form-select form-select-sm">
+                                <option value="{{ active_list.id }}">Добавить в список «{{ active_list.name }}»</option>
+                                <option value="">Создать новый список «Список из профиля»</option>
+                            </select>
+                            {% else %}
+                            <input type="hidden" name="list_id" value="">
+                            <span class="small text-muted">Будет создан новый список «Список из профиля».</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-12 col-md-4 text-md-end">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                Добавить в список покупок
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
                 <h6>Комментарии к продукту</h6>
                 {% if comments %}
                 <div class="mb-3" style="max-height: 260px; overflow-y: auto;">

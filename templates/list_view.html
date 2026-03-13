@@ -47,9 +47,9 @@
 
             {% if can_edit %}
             <div class="card-body border-bottom">
-                <form action="{{ url_for('item_add', list_id=lst.id) }}" method="post" class="row g-2">
+                <form action="{{ url_for('item_add', list_id=lst.id) }}" method="post" class="row g-2" autocomplete="off">
                     <div class="col-md-4">
-                        <input type="text" name="name" class="form-control form-control-sm" placeholder="Товар" required>
+                        <input type="text" name="name" class="form-control form-control-sm" placeholder="Товар" required autocomplete="off">
                     </div>
                     <div class="col-md-2">
                         <select name="category_id" class="form-select form-select-sm">

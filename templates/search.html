@@ -5,12 +5,24 @@
     <div class="col-lg-8 mx-auto">
         <div class="card p-4">
             <h1 class="h4 mb-4">Поиск по спискам</h1>
-            <form method="get" class="mb-4">
+            <form method="get" class="mb-4" autocomplete="off">
                 <div class="input-group">
-                    <input type="text" name="q" class="form-control" placeholder="Название товара или заметка..." value="{{ query }}" autofocus>
+                    <input type="text"
+                           name="q"
+                           class="form-control"
+                           placeholder="Название товара или заметка..."
+                           value="{{ query }}"
+                           list="search-names"
+                           autocomplete="off"
+                           autofocus>
                     <button type="submit" class="btn btn-primary">Искать</button>
                 </div>
             </form>
+            <datalist id="search-names">
+                {% for s in suggestions %}
+                <option value="{{ s.name }}"></option>
+                {% endfor %}
+            </datalist>
 
             {% if query %}
             {% if results %}

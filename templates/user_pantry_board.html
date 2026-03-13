@@ -79,6 +79,47 @@
         border-color: rgba(220,53,69,0.5);
         color: #842029;
     }
+    .pantry-aux-wrapper {
+        position: fixed;
+        top: 50%;
+        left: 0;
+        right: 0;
+        transform: translateY(-50%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 1.5rem;
+        z-index: 1050;
+        pointer-events: none;
+    }
+    .pantry-aux-zone {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        min-width: 220px;
+        min-height: 120px;
+        padding: 1rem;
+        border-radius: 1rem;
+        background: rgba(15,23,42,0.04);
+        border: 1px dashed rgba(148,163,184,0.8);
+        color: #475569;
+        font-size: 0.85rem;
+        pointer-events: auto;
+    }
+    .pantry-aux-zone.active {
+        display: flex;
+    }
+    .pantry-aux-zone.trash {
+        background: rgba(248,113,113,0.1);
+        border-color: rgba(239,68,68,0.8);
+        color: #b91c1c;
+    }
+    .pantry-aux-zone.add {
+        background: rgba(59,130,246,0.08);
+        border-color: rgba(37,99,235,0.8);
+        color: #1d4ed8;
+    }
 </style>
 {% endblock %}
 {% block content %}
@@ -245,6 +286,17 @@
             </div>
         </div>
 
+        {% if can_edit %}
+        <div class="pantry-aux-wrapper">
+            <div class="pantry-aux-zone add" id="pantry-add-zone">
+                Перетащите сюда, чтобы<br>добавить в список покупок
+            </div>
+            <div class="pantry-aux-zone trash" id="pantry-trash-zone">
+                Перетащите сюда, чтобы удалить<br>из «продуктов дома»
+            </div>
+        </div>
+        {% endif %}
+
         <div class="alert alert-info small mt-3">
             Поделитесь ссылкой на эту страницу с семьёй, чтобы всем было видно, какие продукты дома есть,
             заканчиваются или закончились.
@@ -259,11 +311,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     let draggedId = null;
+    const addZone = document.getElementById('pantry-add-zone');
+    const trashZone = document.getElementById('pantry-trash-zone');
 
     document.querySelectorAll('.pantry-draggable').forEach(function (el) {
         el.addEventListener('dragstart', function (e) {
             draggedId = el.getAttribute('data-id');
             e.dataTransfer.effectAllowed = 'move';
+            if (addZone) addZone.classList.add('active');
+            if (trashZone) trashZone.classList.add('active');
+        });
+        el.addEventListener('dragend', function () {
+            if (addZone) addZone.classList.remove('active');
+            if (trashZone) trashZone.classList.remove('active');
         });
     });
 
@@ -277,6 +337,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!draggedId) return;
             const targetState = zone.getAttribute('data-target-state');
             if (!targetState) return;
+            if (addZone) addZone.classList.remove('active');
+            if (trashZone) trashZone.classList.remove('active');
             fetch('/me/pantry/' + encodeURIComponent(draggedId) + '/state', {
                 method: 'POST',
                 headers: {
@@ -324,6 +386,40 @@ document.addEventListener('DOMContentLoaded', function () {
             document.body.removeChild(tmp);
         });
     }
+
+    function setupDropZone(zone, onDrop) {
+        if (!zone) return;
+        zone.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        zone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            if (!draggedId) return;
+            if (addZone) addZone.classList.remove('active');
+            if (trashZone) trashZone.classList.remove('active');
+            onDrop(draggedId);
+        });
+    }
+
+    setupDropZone(addZone, function (id) {
+        const form = document.getElementById('add-to-list-form');
+        const modalEl = document.getElementById('addToListModal');
+        if (!form || !modalEl) return;
+        form.action = '/me/pantry/item/' + encodeURIComponent(id) + '/add-to-list';
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    });
+
+    setupDropZone(trashZone, function (id) {
+        fetch('/me/pantry/' + encodeURIComponent(id) + '/remove', {
+            method: 'POST'
+        }).then(function () {
+            window.location.reload();
+        }).catch(function () {
+            window.location.reload();
+        });
+    });
 });
 </script>
 {% endif %}
