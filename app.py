@@ -1091,12 +1091,10 @@ def settings():
     return render_template('settings.html', user=user)
 
 
-@app.route('/avatar/me')
-@login_required
-def avatar_me():
-    """Отдаёт аватар с сервера (без presigned URL в браузере) — надёжнее для Yandex Object Storage."""
+def _avatar_response_for_user(user_id: int):
+    """Отдаёт файл аватара из S3 для указанного пользователя."""
     conn = get_db()
-    row = conn.execute('SELECT avatar_key FROM users WHERE id = ?', (current_user.id,)).fetchone()
+    row = conn.execute('SELECT avatar_key FROM users WHERE id = ?', (user_id,)).fetchone()
     conn.close()
     key = row['avatar_key'] if row else None
     if not key or not s3_enabled():
@@ -1113,6 +1111,20 @@ def avatar_me():
         return resp
     except (BotoCoreError, ClientError):
         abort(404)
+
+
+@app.route('/avatar/me')
+@login_required
+def avatar_me():
+    """Аватар текущего пользователя (для шапки и настроек)."""
+    return _avatar_response_for_user(current_user.id)
+
+
+@app.route('/avatar/<int:user_id>')
+@login_required
+def avatar_user(user_id):
+    """Аватар пользователя по id (профиль и просмотр)."""
+    return _avatar_response_for_user(user_id)
 
 
 @app.route('/me/profile', methods=['GET', 'POST'])
