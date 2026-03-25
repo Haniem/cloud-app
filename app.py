@@ -13,6 +13,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from botocore.exceptions import BotoCoreError, ClientError
+from botocore.config import Config as BotoConfig
 import sqlite3
 from datetime import datetime
 import boto3
@@ -56,6 +57,12 @@ def get_s3_client():
         kwargs['region_name'] = S3_REGION
     if S3_ENDPOINT_URL:
         kwargs['endpoint_url'] = S3_ENDPOINT_URL
+        # Yandex Object Storage: path-style + v4 — стабильнее для put/get/presign
+        if 'yandexcloud.net' in S3_ENDPOINT_URL.lower():
+            kwargs['config'] = BotoConfig(
+                signature_version='s3v4',
+                s3={'addressing_style': 'path'},
+            )
 
     access_key = os.environ.get('S3_ACCESS_KEY_ID') or os.environ.get('AWS_ACCESS_KEY_ID')
     secret_key = os.environ.get('S3_SECRET_ACCESS_KEY') or os.environ.get('AWS_SECRET_ACCESS_KEY')
@@ -1045,8 +1052,8 @@ def settings():
                     Body=buf,
                     ContentType='image/jpeg',
                 )
-            except (BotoCoreError, ClientError):
-                flash('Ошибка загрузки аватара в S3', 'danger')
+            except (BotoCoreError, ClientError) as e:
+                flash(f'Ошибка загрузки аватара в S3: {e}', 'danger')
                 return redirect(url_for('settings'))
 
             # Удаляем старый аватар, чтобы не копились объекты
@@ -1067,6 +1074,30 @@ def settings():
     user = conn.execute('SELECT * FROM users WHERE id = ?', (current_user.id,)).fetchone()
     conn.close()
     return render_template('settings.html', user=user)
+
+
+@app.route('/avatar/me')
+@login_required
+def avatar_me():
+    """Отдаёт аватар с сервера (без presigned URL в браузере) — надёжнее для Yandex Object Storage."""
+    conn = get_db()
+    row = conn.execute('SELECT avatar_key FROM users WHERE id = ?', (current_user.id,)).fetchone()
+    conn.close()
+    key = row['avatar_key'] if row else None
+    if not key or not s3_enabled():
+        abort(404)
+    client = get_s3_client()
+    if not client:
+        abort(503)
+    try:
+        obj = client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+        body = obj['Body'].read()
+        ct = obj.get('ContentType') or 'image/jpeg'
+        resp = Response(body, mimetype=ct)
+        resp.headers['Cache-Control'] = 'private, max-age=300'
+        return resp
+    except (BotoCoreError, ClientError):
+        abort(404)
 
 
 @app.route('/me/profile', methods=['GET', 'POST'])

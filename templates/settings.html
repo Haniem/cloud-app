@@ -37,7 +37,7 @@
             <div class="d-flex align-items-center gap-3 mb-3">
                 {% if user.avatar_key %}
                     <img
-                        src="{{ avatar_url(user.avatar_key) }}"
+                        src="{{ url_for('avatar_me') }}"
                         alt="avatar"
                         style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:#fff;border:1px solid rgba(0,0,0,0.08);"
                     />
