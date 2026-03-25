@@ -1,0 +1,9 @@
+# Blueprint: https://docs.render.com/docs/blueprint-spec
+# Если сервис уже создан вручную — в Dashboard укажи Start Command как в startCommand ниже (или оставь пустым и используй Procfile).
+services:
+  - type: web
+    name: cloud-app
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app

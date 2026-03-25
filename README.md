@@ -34,9 +34,11 @@ python app.py
 2. **New** → **Web Service** → подключите репозиторий GitHub
 3. Настройки:
    - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `gunicorn app:app`
-   - **Environment:** добавьте `SECRET_KEY` = случайная строка (для сессий)
+   - **Start Command:** `gunicorn --bind 0.0.0.0:$PORT app:app` (не `python app.py` — иначе Flask dev-сервер слушает только `127.0.0.1` и Render не видит порт)
+   - **Environment:** добавьте `SECRET_KEY` и переменные S3 (см. ниже)
 4. **Create Web Service**
+
+Если в логах видно `Running 'python app.py'` — откройте **Settings** → **Start Command** и замените команду на строку с `gunicorn` выше (или очистите поле, если используете `Procfile` / `render.yaml`).
 
 ## Подключение S3 для аватаров
 

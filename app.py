@@ -1711,6 +1711,9 @@ def api_docs():
 
 
 if __name__ == '__main__':
-    # На Windows порт 5000 часто занят (службы / зарезервированные диапазоны) — по умолчанию 5001
+    # Локально: 127.0.0.1 + debug. На Render переменная RENDER задана — нужен 0.0.0.0 (и лучше gunicorn через Start Command).
     port = int(os.environ.get('PORT', 5001))
-    app.run(host='127.0.0.1', port=port, debug=True)
+    if os.environ.get('RENDER'):
+        app.run(host='0.0.0.0', port=port, debug=False)
+    else:
+        app.run(host='127.0.0.1', port=port, debug=True)
