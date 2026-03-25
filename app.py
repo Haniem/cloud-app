@@ -48,9 +48,17 @@ def s3_enabled() -> bool:
     return bool(S3_BUCKET_NAME)
 
 
+def s3_credentials_configured() -> bool:
+    ak = os.environ.get('S3_ACCESS_KEY_ID') or os.environ.get('AWS_ACCESS_KEY_ID')
+    sk = os.environ.get('S3_SECRET_ACCESS_KEY') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+    return bool(ak and sk)
+
+
 def get_s3_client():
-    # Если ключей/endpoint не заданы, boto3 попробует использовать их из окружения автоматически.
+    # Без явных ключей boto3 не должен «угадывать» на Render — там нет ~/.aws/credentials.
     if not s3_enabled():
+        return None
+    if not s3_credentials_configured():
         return None
     kwargs = {}
     if S3_REGION:
@@ -66,9 +74,8 @@ def get_s3_client():
 
     access_key = os.environ.get('S3_ACCESS_KEY_ID') or os.environ.get('AWS_ACCESS_KEY_ID')
     secret_key = os.environ.get('S3_SECRET_ACCESS_KEY') or os.environ.get('AWS_SECRET_ACCESS_KEY')
-    if access_key and secret_key:
-        kwargs['aws_access_key_id'] = access_key
-        kwargs['aws_secret_access_key'] = secret_key
+    kwargs['aws_access_key_id'] = access_key
+    kwargs['aws_secret_access_key'] = secret_key
 
     return boto3.client('s3', **kwargs)
 
@@ -1025,6 +1032,14 @@ def settings():
                 return redirect(url_for('settings'))
             if not s3_enabled():
                 flash('S3 не настроен. Добавьте переменные окружения для подключения.', 'danger')
+                return redirect(url_for('settings'))
+            if not s3_credentials_configured():
+                flash(
+                    'Не заданы ключи S3. На Render: Environment → Environment Variables → '
+                    'добавьте S3_ACCESS_KEY_ID и S3_SECRET_ACCESS_KEY (или AWS_ACCESS_KEY_ID и AWS_SECRET_ACCESS_KEY). '
+                    'Файл .env локально на сервер не попадает.',
+                    'danger',
+                )
                 return redirect(url_for('settings'))
 
             client = get_s3_client()
