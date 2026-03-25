@@ -1,3 +1,6 @@
 flask>=3.0.0
 flask-login>=0.6.3
 gunicorn>=21.0.0
+python-dotenv>=1.0.0
+boto3
+Pillow

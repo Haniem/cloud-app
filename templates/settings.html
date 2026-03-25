@@ -30,6 +30,35 @@
             </form>
 
             <p class="text-muted small mt-3 mb-0">Логин: {{ user.username }}</p>
+
+            <hr>
+
+            <h6 class="mb-2">Аватар</h6>
+            <div class="d-flex align-items-center gap-3 mb-3">
+                {% if user.avatar_key %}
+                    <img
+                        src="{{ avatar_url(user.avatar_key) }}"
+                        alt="avatar"
+                        style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:#fff;border:1px solid rgba(0,0,0,0.08);"
+                    />
+                {% else %}
+                    <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.7);border:1px dashed rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;color:#666;">
+                        ?
+                    </div>
+                {% endif %}
+                <div class="text-muted small">
+                    Загружаются только изображения.
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="mb-2">
+                <input type="hidden" name="action" value="avatar">
+                <input type="file" name="avatar" class="form-control form-control-sm" accept="image/*" required>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Загрузить</button>
+                    <a href="{{ url_for('settings') }}" class="btn btn-outline-secondary btn-sm">Отмена</a>
+                </div>
+            </form>
         </div>
     </div>
 </div>

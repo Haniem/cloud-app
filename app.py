@@ -1,11 +1,22 @@
 import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 import json
+import io
+import uuid
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, jsonify, Response
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from botocore.exceptions import BotoCoreError, ClientError
 import sqlite3
 from datetime import datetime
+import boto3
+from PIL import Image
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
@@ -15,6 +26,65 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Войдите, чтобы продолжить'
+
+
+# ---- S3 config (avatars & images) ----
+# Ожидаемые переменные окружения (можно S3-совместимые, не только AWS):
+# - S3_BUCKET_NAME
+# - S3_REGION (необязательно для некоторых S3-совместимых хранилищ)
+# - S3_ENDPOINT_URL (необязательно; например, для MinIO/совместимых)
+# - AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (или S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY)
+# - S3_AVATAR_PREFIX (по умолчанию: avatars)
+# - S3_PRESIGN_EXPIRES (по умолчанию: 3600 секунд)
+S3_BUCKET_NAME = os.environ.get('S3_BUCKET_NAME') or os.environ.get('S3_BUCKET') or ''
+S3_REGION = os.environ.get('S3_REGION') or os.environ.get('AWS_REGION') or os.environ.get('AWS_DEFAULT_REGION')
+S3_ENDPOINT_URL = os.environ.get('S3_ENDPOINT_URL') or os.environ.get('AWS_ENDPOINT_URL')
+S3_AVATAR_PREFIX = os.environ.get('S3_AVATAR_PREFIX', 'avatars')
+S3_PRESIGN_EXPIRES = int(os.environ.get('S3_PRESIGN_EXPIRES', '3600'))
+
+
+def s3_enabled() -> bool:
+    return bool(S3_BUCKET_NAME)
+
+
+def get_s3_client():
+    # Если ключей/endpoint не заданы, boto3 попробует использовать их из окружения автоматически.
+    if not s3_enabled():
+        return None
+    kwargs = {}
+    if S3_REGION:
+        kwargs['region_name'] = S3_REGION
+    if S3_ENDPOINT_URL:
+        kwargs['endpoint_url'] = S3_ENDPOINT_URL
+
+    access_key = os.environ.get('S3_ACCESS_KEY_ID') or os.environ.get('AWS_ACCESS_KEY_ID')
+    secret_key = os.environ.get('S3_SECRET_ACCESS_KEY') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+    if access_key and secret_key:
+        kwargs['aws_access_key_id'] = access_key
+        kwargs['aws_secret_access_key'] = secret_key
+
+    return boto3.client('s3', **kwargs)
+
+
+def avatar_url(avatar_key: str):
+    if not avatar_key or not s3_enabled():
+        return None
+    client = get_s3_client()
+    if not client:
+        return None
+    try:
+        return client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET_NAME, 'Key': avatar_key},
+            ExpiresIn=S3_PRESIGN_EXPIRES,
+        )
+    except (BotoCoreError, ClientError):
+        return None
+
+
+@app.context_processor
+def inject_template_helpers():
+    return {'avatar_url': avatar_url}
 
 
 def get_db():
@@ -42,6 +112,7 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            avatar_key TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS lists (
@@ -406,16 +477,25 @@ def init_db():
             ('Полоски для чистки унитаза', 2),
             ('Освежитель для обуви', 2);
     ''')
+    # Migration for existing DBs
+    cols = [r['name'] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if 'avatar_key' not in cols:
+        conn.execute('ALTER TABLE users ADD COLUMN avatar_key TEXT')
     conn.commit()
     conn.close()
 
 
+# Ensure schema exists even when running under gunicorn (Render)
+init_db()
+
+
 class User:
-    def __init__(self, id, username, email, password_hash):
+    def __init__(self, id, username, email, password_hash, avatar_key=None):
         self.id = id
         self.username = username
         self.email = email
         self.password_hash = password_hash
+        self.avatar_key = avatar_key
         self.is_authenticated = True
         self.is_active = True
         self.is_anonymous = False
@@ -430,7 +510,7 @@ def load_user(user_id):
     row = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
     conn.close()
     if row:
-        return User(row['id'], row['username'], row['email'], row['password_hash'])
+        return User(row['id'], row['username'], row['email'], row['password_hash'], row['avatar_key'])
     return None
 
 
@@ -506,7 +586,7 @@ def login():
         ).fetchone()
         conn.close()
         if user_row and check_password_hash(user_row['password_hash'], password):
-            user = User(user_row['id'], user_row['username'], user_row['email'], user_row['password_hash'])
+            user = User(user_row['id'], user_row['username'], user_row['email'], user_row['password_hash'], user_row['avatar_key'])
             login_user(user)
             flash(f'Вход выполнен', 'success')
             return redirect(url_for('index'))
@@ -928,6 +1008,60 @@ def settings():
                 except sqlite3.IntegrityError:
                     flash('Email уже занят', 'danger')
                 conn.close()
+        elif action == 'avatar':
+            f = request.files.get('avatar')
+            if not f or not f.filename:
+                flash('Выберите файл', 'danger')
+                return redirect(url_for('settings'))
+            if not f.mimetype or not f.mimetype.startswith('image/'):
+                flash('Загрузите изображение', 'danger')
+                return redirect(url_for('settings'))
+            if not s3_enabled():
+                flash('S3 не настроен. Добавьте переменные окружения для подключения.', 'danger')
+                return redirect(url_for('settings'))
+
+            client = get_s3_client()
+            if not client:
+                flash('Не удалось инициализировать S3 клиент', 'danger')
+                return redirect(url_for('settings'))
+
+            try:
+                # Сжимаем до 256x256 и сохраняем как JPEG (универсальный формат)
+                img = Image.open(f.stream)
+                img = img.convert('RGB')
+                img.thumbnail((256, 256))
+                buf = io.BytesIO()
+                img.save(buf, format='JPEG', quality=85, optimize=True)
+                buf.seek(0)
+            except Exception:
+                flash('Не удалось обработать изображение', 'danger')
+                return redirect(url_for('settings'))
+
+            key = f"{S3_AVATAR_PREFIX}/{current_user.id}/{uuid.uuid4().hex}.jpg"
+            try:
+                client.put_object(
+                    Bucket=S3_BUCKET_NAME,
+                    Key=key,
+                    Body=buf,
+                    ContentType='image/jpeg',
+                )
+            except (BotoCoreError, ClientError):
+                flash('Ошибка загрузки аватара в S3', 'danger')
+                return redirect(url_for('settings'))
+
+            # Удаляем старый аватар, чтобы не копились объекты
+            old_key = getattr(current_user, 'avatar_key', None)
+            if old_key:
+                try:
+                    client.delete_object(Bucket=S3_BUCKET_NAME, Key=old_key)
+                except Exception:
+                    pass
+
+            conn = get_db()
+            conn.execute('UPDATE users SET avatar_key = ? WHERE id = ?', (key, current_user.id))
+            conn.commit()
+            conn.close()
+            flash('Аватар обновлён', 'success')
         return redirect(url_for('settings'))
     conn = get_db()
     user = conn.execute('SELECT * FROM users WHERE id = ?', (current_user.id,)).fetchone()
@@ -1577,6 +1711,6 @@ def api_docs():
 
 
 if __name__ == '__main__':
-    init_db()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # На Windows порт 5000 часто занят (службы / зарезервированные диапазоны) — по умолчанию 5001
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='127.0.0.1', port=port, debug=True)
