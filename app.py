@@ -503,6 +503,22 @@ def init_db():
 init_db()
 
 
+def ensure_default_admin():
+    """Тестовый пользователь admin / admin (создаётся один раз, если нет записи с таким логином)."""
+    conn = get_db()
+    exists = conn.execute('SELECT 1 FROM users WHERE username = ?', ('admin',)).fetchone()
+    if not exists:
+        conn.execute(
+            'INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)',
+            ('admin', 'admin@localhost', generate_password_hash('admin')),
+        )
+        conn.commit()
+    conn.close()
+
+
+ensure_default_admin()
+
+
 class User:
     def __init__(self, id, username, email, password_hash, avatar_key=None):
         self.id = id
@@ -559,7 +575,7 @@ def list_access(role='viewer'):
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('my_profile'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
@@ -589,7 +605,7 @@ def register():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('my_profile'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -603,7 +619,7 @@ def login():
             user = User(user_row['id'], user_row['username'], user_row['email'], user_row['password_hash'], user_row['avatar_key'])
             login_user(user)
             flash(f'Вход выполнен', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('my_profile'))
         flash('Неверный логин или пароль', 'danger')
     return render_template('login.html')
 
@@ -1051,9 +1067,14 @@ def settings():
                 # Сжимаем до 256x256 и сохраняем как JPEG (универсальный формат)
                 img = Image.open(f.stream)
                 img = img.convert('RGB')
-                img.thumbnail((256, 256))
+                # Достаточно пикселей для шапки/профиля на Retina без «мыла»
+                try:
+                    _resample = Image.Resampling.LANCZOS
+                except AttributeError:
+                    _resample = Image.LANCZOS
+                img.thumbnail((768, 768), _resample)
                 buf = io.BytesIO()
-                img.save(buf, format='JPEG', quality=85, optimize=True)
+                img.save(buf, format='JPEG', quality=92, optimize=True, subsampling=0)
                 buf.seek(0)
             except Exception:
                 flash('Не удалось обработать изображение', 'danger')
