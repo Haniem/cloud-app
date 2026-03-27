@@ -54,9 +54,3 @@ python app.py
    - `S3_ENDPOINT_URL` (если не AWS)
    - `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` или `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
 5. Откройте в приложении `Настройки` и загрузите аватар — он будет сохранён в S3, а его ключ (`avatar_key`) — в SQLite.
-
-## Альтернатива: PythonAnywhere
-
-1. Зарегистрируйтесь на [pythonanywhere.com](https://www.pythonanywhere.com)
-2. Загрузите файлы через Files
-3. Создайте веб-приложение (Flask), укажите путь к `app.py`
